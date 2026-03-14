@@ -1,0 +1,42 @@
+/* 全局样式 - 修复 Element Plus 组件层级问题 */
+
+/* 降低表格固定列的 z-index */
+.el-table__cell.el-table-fixed-column--right,
+.el-table__cell.el-table-fixed-column--left {
+  z-index: 1 !important;
+}
+
+/* 当图片预览打开时，将 sticky 改为 relative */
+body:has(.el-image-viewer__wrapper) .el-table__cell.el-table-fixed-column--right,
+body:has(.el-image-viewer__wrapper) .el-table__cell.el-table-fixed-column--left {
+  position: relative !important;
+}
+
+/* 当图片预览打开时，移除 main-content 的 overflow，避免创建新的层叠上下文 */
+body:has(.el-image-viewer__wrapper) .main-content {
+  overflow: visible !important;
+}
+
+/* 当图片预览打开时，降低其他 overlay 的 z-index */
+body:has(.el-image-viewer__wrapper) .el-overlay:not(.el-image-viewer__mask) {
+  z-index: 1 !important;
+}
+
+/* 修复遮罩层遮挡图片的问题 - 将遮罩层放到最底层 */
+.el-image-viewer__mask {
+  z-index: -1 !important;
+  pointer-events: none !important;
+}
+
+/* 确保图片和操作按钮可以正常交互 */
+.el-image-viewer__canvas,
+.el-image-viewer__img {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+.el-image-viewer__btn,
+.el-image-viewer__close,
+.el-image-viewer__actions {
+  z-index: 2 !important;
+}

@@ -1,0 +1,19 @@
+<template>
+  <div class="login-layout">
+    <router-view />
+  </div>
+</template>
+
+<script setup lang="ts">
+</script>
+
+<style scoped>
+.login-layout {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+</style>

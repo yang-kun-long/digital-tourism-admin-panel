@@ -1,0 +1,29 @@
+{
+  "$schema": "https://framework-1258016615.tcloudbaseapp.com/schema/latest.json",
+  "envId": "cultural-tourism-7fb138kf77a2cb2",
+  "framework": {
+    "name": "vue",
+    "plugins": {
+      "client": {
+        "use": "@cloudbase/framework-plugin-website",
+        "inputs": {
+          "buildCommand": "npm run build",
+          "outputPath": "dist",
+          "cloudPath": "/admin",
+          "ignore": [
+            ".git",
+            ".github",
+            "node_modules",
+            "cloudbaserc.js"
+          ],
+          "routes": [
+            {
+              "path": "/admin/*",
+              "target": "/admin/index.html"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
