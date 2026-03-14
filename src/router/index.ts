@@ -258,7 +258,7 @@ const routes: RouteRecordRaw[] = [
 ]
 
 const router = createRouter({
-  history: createWebHistory('/admin-panel/'),
+  history: createWebHistory('/admin/'),
   routes
 })
 
