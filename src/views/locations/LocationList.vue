@@ -409,14 +409,6 @@ const form = ref({
   status: 'active'
 })
 
-const rules: FormRules = {
-  name: [{ required: true, message: '请输入地点名称', trigger: 'blur' }],
-  description: [{ required: true, message: '请输入地点描述', trigger: 'blur' }],
-  type: [{ required: true, message: '请选择地点类型', trigger: 'change' }],
-  address: [{ required: true, message: '请输入地址', trigger: 'blur' }],
-  coverImage: [{ required: true, message: '请输入封面图片URL', trigger: 'blur' }]
-}
-
 const tagInputVisible = ref(false)
 const tagInputValue = ref('')
 const tagInputRef = ref()
@@ -424,6 +416,22 @@ const tagInputRef = ref()
 // 上传相关
 const selectedCoverFile = ref<File | null>(null)
 const coverPreviewUrl = ref('')
+
+const validateCoverImage = (_rule: unknown, value: string, callback: (error?: Error) => void) => {
+  if (value || selectedCoverFile.value) {
+    callback()
+    return
+  }
+  callback(new Error('请上传封面图片'))
+}
+
+const rules: FormRules = {
+  name: [{ required: true, message: '请输入地点名称', trigger: 'blur' }],
+  description: [{ required: true, message: '请输入地点描述', trigger: 'blur' }],
+  type: [{ required: true, message: '请选择地点类型', trigger: 'change' }],
+  address: [{ required: true, message: '请输入地址', trigger: 'blur' }],
+  coverImage: [{ validator: validateCoverImage, trigger: 'change' }]
+}
 
 const adminInfo = computed(() => {
   const saved = localStorage.getItem('adminInfo')
@@ -569,6 +577,7 @@ const handleCoverSelect = async (options: UploadRequestOptions) => {
 
   // 保存文件对象
   selectedCoverFile.value = file
+  formRef.value?.clearValidate('coverImage')
 
   // 生成本地预览 URL
   const reader = new FileReader()

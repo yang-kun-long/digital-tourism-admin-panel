@@ -120,17 +120,25 @@ const form = ref({
   photoSetCount: 0
 })
 
-const rules: FormRules = {
-  name: [{ required: true, message: '请输入模板名称', trigger: 'blur' }],
-  category: [{ required: true, message: '请选择模板分类', trigger: 'change' }],
-  cover: [{ required: true, message: '请上传封面图片', trigger: 'change' }]
-}
-
 const tagInputVisible = ref(false)
 const tagInputValue = ref('')
 const tagInputRef = ref()
 
 const coverPreviewUrl = ref('')
+
+const validateCover = (_rule: unknown, value: string, callback: (error?: Error) => void) => {
+  if (value || selectedFile.value) {
+    callback()
+    return
+  }
+  callback(new Error('请上传封面图片'))
+}
+
+const rules: FormRules = {
+  name: [{ required: true, message: '请输入模板名称', trigger: 'blur' }],
+  category: [{ required: true, message: '请选择模板分类', trigger: 'change' }],
+  cover: [{ validator: validateCover, trigger: 'change' }]
+}
 
 const adminInfo = computed(() => {
   const saved = localStorage.getItem('adminInfo')
@@ -198,6 +206,7 @@ const handleCoverUpload = async (options: UploadRequestOptions) => {
 
   // 保存文件对象
   selectedFile.value = file
+  formRef.value?.clearValidate('cover')
 
   // 生成本地预览 URL
   const reader = new FileReader()

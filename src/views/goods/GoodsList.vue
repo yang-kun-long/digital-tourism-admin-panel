@@ -384,13 +384,6 @@ const form = ref({
   status: 'active'
 })
 
-const rules: FormRules = {
-  name: [{ required: true, message: '请输入商品名称', trigger: 'blur' }],
-  description: [{ required: true, message: '请输入商品描述', trigger: 'blur' }],
-  category: [{ required: true, message: '请选择商品分类', trigger: 'change' }],
-  coverImage: [{ required: true, message: '请上传封面图片', trigger: 'change' }]
-}
-
 const tagInputVisible = ref(false)
 const tagInputValue = ref('')
 const tagInputRef = ref()
@@ -402,6 +395,21 @@ const imageInputValue = ref('')
 const selectedCoverFile = ref<File | null>(null)
 const coverPreviewUrl = ref('')
 const imagePreviewList = ref<Array<{ file: File | null; url: string; isExisting: boolean }>>([])
+
+const validateCoverImage = (_rule: unknown, value: string, callback: (error?: Error) => void) => {
+  if (value || selectedCoverFile.value) {
+    callback()
+    return
+  }
+  callback(new Error('请上传封面图片'))
+}
+
+const rules: FormRules = {
+  name: [{ required: true, message: '请输入商品名称', trigger: 'blur' }],
+  description: [{ required: true, message: '请输入商品描述', trigger: 'blur' }],
+  category: [{ required: true, message: '请选择商品分类', trigger: 'change' }],
+  coverImage: [{ validator: validateCoverImage, trigger: 'change' }]
+}
 
 const adminInfo = computed(() => {
   const saved = localStorage.getItem('adminInfo')
@@ -590,6 +598,7 @@ const handleCoverSelect = async (options: UploadRequestOptions) => {
 
   // 保存文件对象
   selectedCoverFile.value = file
+  formRef.value?.clearValidate('coverImage')
 
   // 生成本地预览 URL
   const reader = new FileReader()
@@ -597,9 +606,6 @@ const handleCoverSelect = async (options: UploadRequestOptions) => {
     coverPreviewUrl.value = e.target?.result as string
   }
   reader.readAsDataURL(file)
-
-  // 设置一个临时值，让表单验证通过
-  form.value.coverImage = 'pending_upload'
 
   ElMessage.success('封面已选择，点击确定后将上传')
 }
