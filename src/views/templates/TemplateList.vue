@@ -53,12 +53,19 @@
             <el-image
               :src="row.cover"
               fit="cover"
-              style="width: 60px; height: 60px; border-radius: 4px"
+              style="width: 60px; height: 60px; border-radius: 4px; cursor: pointer"
               :preview-teleported="true" :preview-src-list="[row.cover]"
+              @click="openDetailDialog(row)"
             />
           </template>
         </el-table-column>
-        <el-table-column prop="name" label="模板名称" min-width="150" />
+        <el-table-column prop="name" label="模板名称" min-width="150">
+          <template #default="{ row }">
+            <span style="cursor: pointer; color: #409EFF" @click="openDetailDialog(row)">
+              {{ row.name }}
+            </span>
+          </template>
+        </el-table-column>
         <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
         <el-table-column prop="category" label="分类" width="120" />
         <el-table-column label="标签" width="200">
@@ -110,7 +117,7 @@
             <el-button
               size="small"
               type="danger"
-              @click="handleDelete(row)"
+              @click="console.log('点击删除按钮', row); handleDelete(row)"
             >
               删除
             </el-button>
@@ -163,8 +170,11 @@
             :on-change="handleCoverChange"
             accept="image/*"
           >
-            <el-button size="small" type="primary">选择图片</el-button>
+            <el-button size="small" type="primary">选择封面</el-button>
           </el-upload>
+          <div style="color: #909399; font-size: 12px; margin-top: 5px;">
+            封面将作为模板的第一张照片
+          </div>
           <div v-if="form.cover || coverPreviewUrl" style="margin-top: 10px; position: relative; display: inline-block;">
             <el-image
               :src="coverPreviewUrl || processImageUrlSync(form.cover)"
@@ -184,6 +194,44 @@
           <div v-if="uploadingCover" style="margin-top: 10px;">
             <el-progress :percentage="uploadProgress" />
             <span style="margin-left: 10px; color: #909399; font-size: 12px;">上传中...</span>
+          </div>
+        </el-form-item>
+        <el-form-item label="模板照片" v-if="!isEdit">
+          <el-upload
+            :auto-upload="false"
+            :show-file-list="false"
+            :on-change="handlePhotosChange"
+            accept="image/*"
+            multiple
+          >
+            <el-button size="small">选择照片（可多选）</el-button>
+          </el-upload>
+          <div style="color: #909399; font-size: 12px; margin-top: 5px;">
+            封面已作为第一张照片，此处可继续添加其他照片（最多8张）
+          </div>
+          <div v-if="selectedPhotoFiles.length > 0" style="margin-top: 10px;">
+            <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+              <div
+                v-for="(url, index) in photoPreviewUrls"
+                :key="index"
+                style="position: relative; display: inline-block;"
+              >
+                <el-image
+                  :src="url"
+                  fit="cover"
+                  style="width: 100px; height: 100px; border-radius: 4px"
+                />
+                <el-button
+                  size="small"
+                  type="danger"
+                  circle
+                  @click="removePhoto(index)"
+                  style="position: absolute; top: 5px; right: 5px;"
+                >
+                  <el-icon><Close /></el-icon>
+                </el-button>
+              </div>
+            </div>
           </div>
         </el-form-item>
         <el-form-item label="标签">
@@ -233,6 +281,112 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 模板详情对话框 -->
+    <el-dialog
+      v-model="detailDialogVisible"
+      :title="detailTemplate?.name"
+      width="900px"
+    >
+      <div v-if="detailTemplate" style="max-height: 70vh; overflow-y: auto;">
+        <!-- 基本信息 -->
+        <div style="margin-bottom: 20px;">
+          <div style="display: flex; gap: 20px; margin-bottom: 15px;">
+            <div style="flex: 1;">
+              <div style="color: #909399; font-size: 12px; margin-bottom: 5px;">分类</div>
+              <el-tag>{{ detailTemplate.category }}</el-tag>
+            </div>
+            <div style="flex: 1;">
+              <div style="color: #909399; font-size: 12px; margin-bottom: 5px;">状态</div>
+              <el-tag :type="detailTemplate.status === 'active' ? 'success' : 'info'">
+                {{ detailTemplate.status === 'active' ? '启用' : '禁用' }}
+              </el-tag>
+            </div>
+            <div style="flex: 1;">
+              <div style="color: #909399; font-size: 12px; margin-bottom: 5px;">允许用户上传</div>
+              <el-tag :type="detailTemplate.allowUserUpload ? 'success' : 'info'">
+                {{ detailTemplate.allowUserUpload ? '是' : '否' }}
+              </el-tag>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 15px;">
+            <div style="color: #909399; font-size: 12px; margin-bottom: 5px;">描述</div>
+            <div>{{ detailTemplate.description }}</div>
+          </div>
+
+          <div style="margin-bottom: 15px;">
+            <div style="color: #909399; font-size: 12px; margin-bottom: 5px;">标签</div>
+            <el-tag v-for="tag in detailTemplate.tags" :key="tag" style="margin-right: 5px">
+              {{ tag }}
+            </el-tag>
+          </div>
+
+          <div style="display: flex; gap: 20px;">
+            <div>
+              <div style="color: #909399; font-size: 12px;">照片数</div>
+              <div style="font-size: 20px; font-weight: bold;">{{ detailTemplate.photoSetCount || 0 }}</div>
+            </div>
+            <div>
+              <div style="color: #909399; font-size: 12px;">点赞数</div>
+              <div style="font-size: 20px; font-weight: bold;">{{ detailTemplate.likeCount || 0 }}</div>
+            </div>
+            <div>
+              <div style="color: #909399; font-size: 12px;">收藏数</div>
+              <div style="font-size: 20px; font-weight: bold;">{{ detailTemplate.favoriteCount || 0 }}</div>
+            </div>
+            <div>
+              <div style="color: #909399; font-size: 12px;">浏览数</div>
+              <div style="font-size: 20px; font-weight: bold;">{{ detailTemplate.viewCount || 0 }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 照片列表 -->
+        <el-divider />
+        <div>
+          <div style="color: #303133; font-size: 16px; font-weight: bold; margin-bottom: 15px;">
+            模板照片
+          </div>
+          <div v-loading="loadingPhotos">
+            <div v-if="detailPhotos.length === 0" style="text-align: center; color: #909399; padding: 40px 0;">
+              暂无照片
+            </div>
+            <div v-else style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px;">
+              <div
+                v-for="photo in detailPhotos"
+                :key="photo._id"
+                style="position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"
+              >
+                <el-image
+                  :src="photo.thumbnailUrl || photo.photoUrl"
+                  fit="cover"
+                  style="width: 100%; height: 200px; cursor: pointer;"
+                  :preview-src-list="[photo.photoUrl]"
+                  :preview-teleported="true"
+                />
+                <div style="padding: 10px; background: white;">
+                  <div style="font-size: 14px; margin-bottom: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    {{ photo.photoName || '未命名' }}
+                  </div>
+                  <div style="display: flex; justify-content: space-between; font-size: 12px; color: #909399;">
+                    <span>❤️ {{ photo.likeCount || 0 }}</span>
+                    <span>👁️ {{ photo.viewCount || 0 }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button @click="detailDialogVisible = false">关闭</el-button>
+        <el-button type="primary" @click="detailDialogVisible = false; detailTemplate && openEditDialog(detailTemplate)">
+          编辑模板
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -240,7 +394,7 @@
 import { ref, onMounted, computed, nextTick, watch } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Refresh, Search, Plus, QuestionFilled } from '@element-plus/icons-vue'
-import { callFunction, processImageUrl, processImageUrlSync, uploadFileViaFunction } from '@/utils/cloudbase'
+import { callFunction, processImageUrl, processImageUrlSync, uploadPhotoWithThumbnail, batchProcessImageUrls } from '@/utils/cloudbase'
 
 interface Template {
   _id: string
@@ -261,6 +415,17 @@ interface Template {
   viewCount: number
   createTime: any
   updateTime: any
+}
+
+interface Photo {
+  _id: string
+  photoName?: string
+  photoUrl: string
+  thumbnailUrl?: string
+  templateId: string
+  likeCount: number
+  viewCount: number
+  sortOrder: number
 }
 
 const templateList = ref<Template[]>([])
@@ -298,8 +463,7 @@ const form = ref({
 const rules: FormRules = {
   name: [{ required: true, message: '请输入模板名称', trigger: 'blur' }],
   description: [{ required: true, message: '请输入模板描述', trigger: 'blur' }],
-  category: [{ required: true, message: '请选择分类', trigger: 'change' }],
-  cover: [{ required: true, message: '请输入封面图片URL', trigger: 'blur' }]
+  category: [{ required: true, message: '请选择分类', trigger: 'change' }]
 }
 
 const tagInputVisible = ref(false)
@@ -310,6 +474,16 @@ const uploadingCover = ref(false)
 const uploadProgress = ref(0)
 const coverPreviewUrl = ref('')
 const selectedCoverFile = ref<File | null>(null)
+
+// 模板照片相关
+const selectedPhotoFiles = ref<File[]>([])
+const photoPreviewUrls = ref<string[]>([])
+
+// 详情对话框相关
+const detailDialogVisible = ref(false)
+const detailTemplate = ref<Template | null>(null)
+const detailPhotos = ref<Photo[]>([])
+const loadingPhotos = ref(false)
 
 const adminInfo = computed(() => {
   const saved = localStorage.getItem('adminInfo')
@@ -389,6 +563,8 @@ const openCreateDialog = () => {
   }
   coverPreviewUrl.value = ''
   selectedCoverFile.value = null
+  selectedPhotoFiles.value = []
+  photoPreviewUrls.value = []
   dialogVisible.value = true
 }
 
@@ -443,7 +619,47 @@ const handleCoverChange = async (file: any) => {
   }
   reader.readAsDataURL(rawFile)
 
-  ElMessage.success('图片已选择，点击确定后将上传')
+  ElMessage.success('封面已选择，点击确定后将上传')
+}
+
+// 处理模板照片选择
+const handlePhotosChange = async (file: any) => {
+  if (!file || !file.raw) return
+
+  const rawFile = file.raw as File
+  const isImage = rawFile.type.startsWith('image/')
+  const isLt10M = rawFile.size / 1024 / 1024 < 10
+
+  if (!isImage) {
+    ElMessage.error('只能上传图片文件')
+    return
+  }
+  if (!isLt10M) {
+    ElMessage.error('图片大小不能超过 10MB')
+    return
+  }
+
+  // 检查数量限制（封面已占1张，最多再加8张）
+  if (selectedPhotoFiles.value.length >= 8) {
+    ElMessage.error('封面已作为第一张照片，最多再添加8张')
+    return
+  }
+
+  // 添加到文件列表
+  selectedPhotoFiles.value.push(rawFile)
+
+  // 生成本地预览 URL
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    photoPreviewUrls.value.push(e.target?.result as string)
+  }
+  reader.readAsDataURL(rawFile)
+}
+
+// 删除照片
+const removePhoto = (index: number) => {
+  selectedPhotoFiles.value.splice(index, 1)
+  photoPreviewUrls.value.splice(index, 1)
 }
 
 // 提交表单
@@ -452,6 +668,12 @@ const handleSubmit = async () => {
 
   await formRef.value.validate(async (valid) => {
     if (!valid) return
+
+    // 创建模板时必须选择封面图片
+    if (!isEdit.value && !selectedCoverFile.value && !form.value.cover) {
+      ElMessage.error('请选择封面图片')
+      return
+    }
 
     submitting.value = true
     try {
@@ -462,13 +684,9 @@ const handleSubmit = async () => {
         uploadingCover.value = true
         ElMessage.info('正在上传图片...')
 
-        const timestamp = Date.now()
-        const randomStr = Math.random().toString(36).substring(2, 8)
-        const ext = selectedCoverFile.value.name.split('.').pop()
-        const cloudPath = `templates/${timestamp}_${randomStr}.${ext}`
-
-        const result = await uploadFileViaFunction(selectedCoverFile.value, cloudPath)
-        coverFileID = result.fileID
+        // 上传缩略图和原图
+        const uploadResult = await uploadPhotoWithThumbnail(selectedCoverFile.value, 'templates')
+        coverFileID = uploadResult.originalFileID
 
         uploadingCover.value = false
       }
@@ -493,6 +711,53 @@ const handleSubmit = async () => {
       const response = await callFunction(functionName, params)
 
       if (response.success) {
+        const newTemplateId = response.data?._id || response.data?.id || response.templateId
+
+        // 创建模板时，上传封面和其他照片
+        if (!isEdit.value && newTemplateId) {
+          try {
+            let photoIndex = 1
+
+            // 1. 上传封面作为第一张照片
+            if (selectedCoverFile.value) {
+              ElMessage.info('正在上传封面照片...')
+              const coverPhotoResult = await uploadPhotoWithThumbnail(selectedCoverFile.value, 'photos/official')
+              await callFunction('createOfficialPhoto', {
+                adminId: adminInfo.value?.id,
+                photoName: `${form.value.name}-封面`,
+                templateId: newTemplateId,
+                photoUrl: coverPhotoResult.originalFileID,
+                thumbnailUrl: coverPhotoResult.thumbnailFileID,
+                sortOrder: photoIndex++,
+                status: 'approved'
+              })
+            }
+
+            // 2. 批量上传其他照片
+            if (selectedPhotoFiles.value.length > 0) {
+              ElMessage.info(`正在上传 ${selectedPhotoFiles.value.length} 张照片...`)
+              for (let i = 0; i < selectedPhotoFiles.value.length; i++) {
+                const file = selectedPhotoFiles.value[i]
+                if (!file) continue
+                const photoResult = await uploadPhotoWithThumbnail(file, 'photos/official')
+                const photoName = file.name.replace(/\.[^/.]+$/, '')
+                await callFunction('createOfficialPhoto', {
+                  adminId: adminInfo.value?.id,
+                  photoName,
+                  templateId: newTemplateId,
+                  photoUrl: photoResult.originalFileID,
+                  thumbnailUrl: photoResult.thumbnailFileID,
+                  sortOrder: photoIndex++,
+                  status: 'approved'
+                })
+              }
+            }
+          } catch (e) {
+            console.warn('照片上传失败:', e)
+            ElMessage.warning('模板创建成功，但部分照片上传失败')
+          }
+        }
+
         ElMessage.success(response.message)
         dialogVisible.value = false
         loadTemplates()
@@ -509,11 +774,57 @@ const handleSubmit = async () => {
   })
 }
 
+// 打开详情对话框
+const openDetailDialog = async (template: Template) => {
+  detailTemplate.value = template
+  detailDialogVisible.value = true
+  detailPhotos.value = []
+
+  // 加载模板照片
+  loadingPhotos.value = true
+  try {
+    const response = await callFunction('getOfficialPhotos', {
+      adminId: adminInfo.value?.id,
+      templateId: template._id,
+      page: 1,
+      pageSize: 100
+    })
+
+    if (response.success) {
+      // 处理照片 URL
+      const photos = response.data || []
+      const photoUrls = photos.map((p: Photo) => p.photoUrl)
+      const thumbnailUrls = photos.map((p: Photo) => p.thumbnailUrl || p.photoUrl)
+
+      const processedPhotoUrls = await batchProcessImageUrls(photoUrls)
+      const processedThumbnailUrls = await batchProcessImageUrls(thumbnailUrls)
+
+      detailPhotos.value = photos.map((photo: Photo, index: number) => ({
+        ...photo,
+        photoUrl: processedPhotoUrls[index],
+        thumbnailUrl: processedThumbnailUrls[index]
+      }))
+    } else {
+      ElMessage.error('加载照片失败')
+    }
+  } catch (error) {
+    console.error('加载照片失败:', error)
+    ElMessage.error('加载照片失败')
+  } finally {
+    loadingPhotos.value = false
+  }
+}
+
 // 删除模板
 const handleDelete = async (template: Template) => {
+  console.log('开始删除模板:', template.name, template._id)
   try {
+    const photoCountMsg = template.photoSetCount > 0
+      ? `\n该模板下有 ${template.photoSetCount} 张照片，将一并删除。`
+      : ''
+
     await ElMessageBox.confirm(
-      `确定要删除模板"${template.name}"吗？删除后不可恢复。`,
+      `确定要删除模板"${template.name}"吗？${photoCountMsg}\n删除后不可恢复。`,
       '确认删除',
       {
         confirmButtonText: '确定',
@@ -522,21 +833,28 @@ const handleDelete = async (template: Template) => {
       }
     )
 
+    console.log('用户确认删除，准备调用云函数')
+    console.log('adminInfo:', adminInfo.value)
+
     const response = await callFunction('deleteOfficialTemplate', {
       adminId: adminInfo.value?.id,
       templateId: template._id
     })
 
+    console.log('删除模板响应:', response)
+
     if (response.success) {
       ElMessage.success(response.message)
       loadTemplates()
     } else {
-      ElMessage.error(response.message)
+      ElMessage.error(response.message || '删除失败')
+      console.error('删除失败，响应:', response)
     }
   } catch (error) {
+    console.log('捕获到错误:', error)
     if (error !== 'cancel') {
-      console.error('删除失败:', error)
-      ElMessage.error('删除失败')
+      console.error('删除失败，错误:', error)
+      ElMessage.error(`删除失败: ${error}`)
     }
   }
 }

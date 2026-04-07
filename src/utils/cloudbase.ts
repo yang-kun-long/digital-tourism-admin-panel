@@ -149,6 +149,72 @@ export const uploadFileViaFunction = async (file: File, cloudPath?: string): Pro
   }
 }
 
+// 上传照片（生成缩略图和原图两个版本）
+export const uploadPhotoWithThumbnail = async (
+  file: File,
+  basePath: string
+): Promise<{ thumbnailFileID: string; originalFileID: string }> => {
+  try {
+    const timestamp = Date.now()
+    const randomStr = Math.random().toString(36).substring(2, 8)
+    const ext = file.name.split('.').pop()
+
+    console.log('[uploadPhotoWithThumbnail] 开始上传照片:', file.name)
+
+    // 1. 生成并上传缩略图（质量 60）
+    console.log('[uploadPhotoWithThumbnail] 生成缩略图...')
+    const thumbnailBase64 = await compressImage(file, 800, 0.6)
+    const thumbnailContent = thumbnailBase64.split(',')[1]
+
+    if (!thumbnailContent) {
+      throw new Error('缩略图数据格式错误')
+    }
+
+    const thumbnailPath = `${basePath}/thumb_${timestamp}_${randomStr}.${ext}`
+    const thumbnailResult = await callFunction('uploadImage', {
+      fileContent: thumbnailContent,
+      cloudPath: thumbnailPath,
+      contentType: file.type
+    })
+
+    if (!thumbnailResult.success) {
+      throw new Error(thumbnailResult.error || '缩略图上传失败')
+    }
+
+    console.log('[uploadPhotoWithThumbnail] 缩略图上传成功:', thumbnailResult.fileID)
+
+    // 2. 生成并上传原图（质量 0.8）
+    console.log('[uploadPhotoWithThumbnail] 生成原图...')
+    const originalBase64 = await compressImage(file, 1920, 0.8)
+    const originalContent = originalBase64.split(',')[1]
+
+    if (!originalContent) {
+      throw new Error('原图数据格式错误')
+    }
+
+    const originalPath = `${basePath}/original_${timestamp}_${randomStr}.${ext}`
+    const originalResult = await callFunction('uploadImage', {
+      fileContent: originalContent,
+      cloudPath: originalPath,
+      contentType: file.type
+    })
+
+    if (!originalResult.success) {
+      throw new Error(originalResult.error || '原图上传失败')
+    }
+
+    console.log('[uploadPhotoWithThumbnail] 原图上传成功:', originalResult.fileID)
+
+    return {
+      thumbnailFileID: thumbnailResult.fileID,
+      originalFileID: originalResult.fileID
+    }
+  } catch (error: any) {
+    console.error('[uploadPhotoWithThumbnail] 上传失败:', error)
+    throw new Error(error?.message || '上传失败')
+  }
+}
+
 // 图片 URL 缓存
 const imageUrlCache = new Map<string, { url: string; expireTime: number }>()
 

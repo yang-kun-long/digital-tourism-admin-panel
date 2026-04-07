@@ -145,12 +145,9 @@
     <el-dialog
       v-model="dialogVisible"
       :title="isEdit ? '编辑照片' : '上传照片'"
-      width="600px"
+      width="700px"
     >
-      <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
-        <el-form-item label="照片名称" prop="photoName">
-          <el-input v-model="form.photoName" placeholder="请输入照片名称" />
-        </el-form-item>
+      <el-form :model="form" :rules="currentRules" ref="formRef" label-width="100px">
         <el-form-item label="所属模板" prop="templateId">
           <el-select v-model="form.templateId" placeholder="请选择模板" style="width: 100%">
             <el-option
@@ -161,33 +158,46 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="照片" prop="photoUrl" v-if="!isEdit">
+        <el-form-item label="照片名称" prop="photoName" v-if="isEdit">
+          <el-input v-model="form.photoName" placeholder="请输入照片名称" />
+        </el-form-item>
+        <el-form-item label="照片" v-if="!isEdit">
           <el-upload
             :auto-upload="false"
             :show-file-list="false"
             :on-change="handlePhotoChange"
             accept="image/*"
+            multiple
           >
-            <el-button size="small" type="primary">选择图片</el-button>
+            <el-button size="small" type="primary">选择图片（可多选）</el-button>
           </el-upload>
-          <div v-if="photoPreviewUrl" style="margin-top: 10px; position: relative; display: inline-block;">
-            <el-image
-              :src="photoPreviewUrl"
-              fit="cover"
-              style="width: 200px; height: 200px; border-radius: 4px"
-            />
-            <el-button
-              size="small"
-              type="danger"
-              circle
-              @click="photoPreviewUrl = ''; selectedPhotoFile = null"
-              style="position: absolute; top: 5px; right: 5px;"
+          <div v-if="selectedPhotoFiles.length > 0" style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px;">
+            <div
+              v-for="(url, index) in photoPreviewUrls"
+              :key="index"
+              style="position: relative; display: inline-block;"
             >
-              <el-icon><Close /></el-icon>
-            </el-button>
+              <el-image
+                :src="url"
+                fit="cover"
+                style="width: 90px; height: 90px; border-radius: 4px; display: block;"
+              />
+              <el-button
+                size="small"
+                type="danger"
+                circle
+                @click="removePhoto(index)"
+                style="position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; padding: 0;"
+              >
+                <el-icon style="font-size: 10px;"><Close /></el-icon>
+              </el-button>
+            </div>
+          </div>
+          <div style="color: #909399; font-size: 12px; margin-top: 5px;">
+            已选择 {{ selectedPhotoFiles.length }} 张照片
           </div>
           <div v-if="uploadingPhoto" style="margin-top: 10px;">
-            <el-progress :percentage="uploadProgress" />
+            <el-progress :percentage="uploadProgress" :format="() => `${uploadedCount}/${selectedPhotoFiles.length}`" />
             <span style="margin-left: 10px; color: #909399; font-size: 12px;">上传中...</span>
           </div>
         </el-form-item>
@@ -220,7 +230,7 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Refresh, Search, Plus, Close, QuestionFilled } from '@element-plus/icons-vue'
-import { callFunction, processImageUrl, uploadFileViaFunction } from '@/utils/cloudbase'
+import { callFunction, processImageUrl, uploadPhotoWithThumbnail } from '@/utils/cloudbase'
 
 interface Photo {
   _id: string
@@ -274,14 +284,27 @@ const form = ref({
 
 const rules: FormRules = {
   photoName: [{ required: true, message: '请输入照片名称', trigger: 'blur' }],
-  templateId: [{ required: true, message: '请选择所属模板', trigger: 'change' }],
-  photoUrl: [{ required: true, message: '请上传照片', trigger: 'blur' }]
+  templateId: [{ required: true, message: '请选择所属模板', trigger: 'change' }]
 }
+
+// 编辑时才需要 photoName
+const currentRules = computed<FormRules>(() => {
+  if (isEdit.value) {
+    return {
+      ...rules,
+      photoName: [{ required: true, message: '请输入照片名称', trigger: 'blur' }]
+    }
+  }
+  return {
+    templateId: rules.templateId
+  }
+})
 
 const uploadingPhoto = ref(false)
 const uploadProgress = ref(0)
-const photoPreviewUrl = ref('')
-const selectedPhotoFile = ref<File | null>(null)
+const uploadedCount = ref(0)
+const selectedPhotoFiles = ref<File[]>([])
+const photoPreviewUrls = ref<string[]>([])
 
 const adminInfo = computed(() => {
   const saved = localStorage.getItem('adminInfo')
@@ -371,8 +394,8 @@ const openUploadDialog = () => {
     sortOrder: 0,
     status: 'approved'
   }
-  photoPreviewUrl.value = ''
-  selectedPhotoFile.value = null
+  selectedPhotoFiles.value = []
+  photoPreviewUrls.value = []
   dialogVisible.value = true
 }
 
@@ -390,7 +413,7 @@ const openEditDialog = async (photo: Photo) => {
   dialogVisible.value = true
 }
 
-// 处理照片选择
+// 处理照片选择（支持多选）
 const handlePhotoChange = async (file: any) => {
   if (!file || !file.raw) return
 
@@ -403,20 +426,23 @@ const handlePhotoChange = async (file: any) => {
     return
   }
   if (!isLt10M) {
-    ElMessage.error('图片大小不能超过 10MB')
+    ElMessage.error(`${rawFile.name} 大小超过 10MB，已跳过`)
     return
   }
 
-  selectedPhotoFile.value = rawFile
+  selectedPhotoFiles.value.push(rawFile)
 
-  // 生成本地预览 URL
   const reader = new FileReader()
   reader.onload = (e) => {
-    photoPreviewUrl.value = e.target?.result as string
+    photoPreviewUrls.value.push(e.target?.result as string)
   }
   reader.readAsDataURL(rawFile)
+}
 
-  ElMessage.success('图片已选择，点击确定后将上传')
+// 移除指定照片
+const removePhoto = (index: number) => {
+  selectedPhotoFiles.value.splice(index, 1)
+  photoPreviewUrls.value.splice(index, 1)
 }
 
 // 提交表单
@@ -426,48 +452,78 @@ const handleSubmit = async () => {
   await formRef.value.validate(async (valid) => {
     if (!valid) return
 
+    if (!isEdit.value && selectedPhotoFiles.value.length === 0) {
+      ElMessage.error('请至少选择一张照片')
+      return
+    }
+
     submitting.value = true
     try {
-      let photoUrl = form.value.photoUrl
-
-      // 如果有新选择的图片，先上传
-      if (selectedPhotoFile.value) {
+      if (isEdit.value) {
+        // 编辑模式：仅更新照片信息
+        const params: any = {
+          adminId: adminInfo.value?.id,
+          photoId: form.value._id,
+          photoName: form.value.photoName,
+          templateId: form.value.templateId,
+          sortOrder: form.value.sortOrder,
+          status: form.value.status
+        }
+        const response = await callFunction('updateOfficialPhoto', params)
+        if (response.success) {
+          ElMessage.success(response.message)
+          dialogVisible.value = false
+          loadPhotos()
+        } else {
+          ElMessage.error(response.message)
+        }
+      } else {
+        // 批量上传多张照片
         uploadingPhoto.value = true
-        ElMessage.info('正在上传图片...')
+        uploadedCount.value = 0
+        uploadProgress.value = 0
 
-        const timestamp = Date.now()
-        const randomStr = Math.random().toString(36).substring(2, 8)
-        const ext = selectedPhotoFile.value.name.split('.').pop()
-        const cloudPath = `photos/official/${timestamp}_${randomStr}.${ext}`
+        let successCount = 0
+        let failCount = 0
+        const files = selectedPhotoFiles.value
+        const total = files.length
 
-        const result = await uploadFileViaFunction(selectedPhotoFile.value, cloudPath)
-        photoUrl = result.fileID
+        for (const file of files) {
+          try {
+            // 上传缩略图和原图
+            const uploadResult = await uploadPhotoWithThumbnail(file, 'photos/official')
+            const photoName = file.name.replace(/\.[^/.]+$/, '')
+
+            await callFunction('createOfficialPhoto', {
+              adminId: adminInfo.value?.id,
+              photoName,
+              templateId: form.value.templateId,
+              photoUrl: uploadResult.originalFileID,
+              thumbnailUrl: uploadResult.thumbnailFileID,
+              sortOrder: form.value.sortOrder,
+              status: form.value.status
+            })
+            successCount++
+          } catch (e) {
+            failCount++
+            console.error('照片上传失败:', e)
+          }
+          uploadedCount.value = successCount + failCount
+          uploadProgress.value = Math.round(((successCount + failCount) / total) * 100)
+        }
 
         uploadingPhoto.value = false
-      }
 
-      const functionName = isEdit.value ? 'updateOfficialPhoto' : 'createOfficialPhoto'
-      const params: any = {
-        adminId: adminInfo.value?.id,
-        photoName: form.value.photoName,
-        templateId: form.value.templateId,
-        photoUrl: photoUrl,
-        sortOrder: form.value.sortOrder,
-        status: form.value.status
-      }
-
-      if (isEdit.value) {
-        params.photoId = form.value._id
-      }
-
-      const response = await callFunction(functionName, params)
-
-      if (response.success) {
-        ElMessage.success(response.message)
-        dialogVisible.value = false
-        loadPhotos()
-      } else {
-        ElMessage.error(response.message)
+        if (successCount > 0) {
+          const msg = failCount > 0
+            ? `成功上传 ${successCount} 张，${failCount} 张失败`
+            : `成功上传 ${successCount} 张照片`
+          ElMessage.success(msg)
+          dialogVisible.value = false
+          loadPhotos()
+        } else {
+          ElMessage.error('所有照片上传失败')
+        }
       }
     } catch (error) {
       console.error('提交失败:', error)
