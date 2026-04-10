@@ -183,12 +183,28 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="纬度">
-              <el-input-number v-model="form.latitude" :precision="6" :step="0.000001" style="width: 100%" />
+              <el-input-number
+                v-model="form.latitude"
+                :min="-90"
+                :max="90"
+                :precision="6"
+                :step="0.000001"
+                placeholder="请输入纬度 (-90 到 90)"
+                style="width: 100%"
+              />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="经度">
-              <el-input-number v-model="form.longitude" :precision="6" :step="0.000001" style="width: 100%" />
+              <el-input-number
+                v-model="form.longitude"
+                :min="-180"
+                :max="180"
+                :precision="6"
+                :step="0.000001"
+                placeholder="请输入经度 (-180 到 180)"
+                style="width: 100%"
+              />
             </el-form-item>
           </el-col>
         </el-row>
@@ -627,8 +643,6 @@ const handleSubmit = async () => {
         type: form.value.type,
         category: form.value.category,
         address: form.value.address,
-        latitude: form.value.latitude,
-        longitude: form.value.longitude,
         coverImage: coverFileID,
         tags: form.value.tags,
         openTime: form.value.openTime,
@@ -637,6 +651,16 @@ const handleSubmit = async () => {
         isFeatured: form.value.isFeatured,
         featuredOrder: form.value.featuredOrder
       }
+
+      // 只有当经纬度是有效数字时才传递
+      if (typeof form.value.latitude === 'number' && !isNaN(form.value.latitude)) {
+        params.latitude = form.value.latitude
+      }
+      if (typeof form.value.longitude === 'number' && !isNaN(form.value.longitude)) {
+        params.longitude = form.value.longitude
+      }
+
+      console.log('提交参数:', params)
 
       if (isEdit.value) {
         params.locationId = form.value._id

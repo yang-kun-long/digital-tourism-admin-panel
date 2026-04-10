@@ -56,6 +56,12 @@ export const menuConfig: MenuItem[] = [
         name: '商品管理',
         icon: 'ShoppingCart',
         roles: ['super_admin', 'content_admin']
+      },
+      {
+        path: '/albums',
+        name: '旅拍相册',
+        icon: 'Camera',
+        roles: ['super_admin', 'content_admin']
       }
     ]
   },
@@ -104,12 +110,6 @@ export const menuConfig: MenuItem[] = [
         roles: ['super_admin']
       }
     ]
-  },
-  {
-    path: '/tools/qrcode',
-    name: '二维码测试',
-    icon: 'Crop',
-    roles: ['super_admin']
   },
   {
     path: '/profile',

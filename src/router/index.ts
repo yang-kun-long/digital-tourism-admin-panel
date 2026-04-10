@@ -36,8 +36,8 @@ import OfficialTemplateForm from '@/views/official-content/templates/TemplateFor
 import AdminManagement from '@/components/AdminManagement.vue'
 import SystemSettings from '@/views/system/SystemSettings.vue'
 
-// 工具
-import QRCodeTest from '@/views/tools/QRCodeTest.vue'
+// 旅拍相册管理
+import AlbumList from '@/views/albums/AlbumList.vue'
 
 // 个人信息
 import ProfileManagement from '@/components/ProfileManagement.vue'
@@ -231,15 +231,15 @@ const routes: RouteRecordRaw[] = [
           roles: ['super_admin']
         }
       },
-      // 工具测试
+      // 旅拍相册管理
       {
-        path: 'tools/qrcode',
-        name: 'QRCodeTest',
-        component: QRCodeTest,
+        path: 'albums',
+        name: 'Albums',
+        component: AlbumList,
         meta: {
-          title: '二维码测试',
-          icon: 'Crop',
-          roles: ['super_admin']
+          title: '旅拍相册',
+          icon: 'Camera',
+          roles: ['super_admin', 'content_admin']
         }
       },
       // 个人信息
