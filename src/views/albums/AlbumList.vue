@@ -266,10 +266,13 @@ const loadAlbums = async () => {
     }
 
     const list: Album[] = res.data
-    const coverFileIDs = list.map((a: Album) => a.coverPhoto).filter(Boolean)
+    const coverFileIDs = list.map((a: Album) => a.coverPhoto).filter(Boolean) as string[]
     const tempUrls = await batchProcessImageUrls(coverFileIDs)
     const urlMap: Record<string, string> = {}
-    coverFileIDs.forEach((id: string, i: number) => { urlMap[id] = tempUrls[i] })
+    coverFileIDs.forEach((id: string, i: number) => {
+      const url = tempUrls[i]
+      if (url) urlMap[id] = url
+    })
 
     albumList.value = list.map((a: Album) => ({
       ...a,
@@ -359,6 +362,8 @@ const handleSubmit = async () => {
 
       for (let i = 0; i < photoItems.value.length; i++) {
         const item = photoItems.value[i]
+        if (!item) continue
+
         if (item.fileID) {
           // 已有照片，直接保留 fileID
           finalFileIDs.push(item.fileID)
@@ -366,7 +371,7 @@ const handleSubmit = async () => {
           // 新照片，上传
           ElMessage.info(`正在上传第 ${i + 1} / ${photoItems.value.length} 张...`)
           const timestamp = Date.now()
-          const ext = item.file.name.split('.').pop()
+          const ext = item.file.name.split('.').pop() || 'jpg'
           const cloudPath = `albums/${timestamp}_${Math.random().toString(36).slice(2, 8)}.${ext}`
           const result = await uploadFileViaFunction(item.file, cloudPath)
           finalFileIDs.push(result.fileID)
